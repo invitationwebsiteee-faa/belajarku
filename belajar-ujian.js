@@ -1,5 +1,5 @@
 /* ============================================================
-   SCRIPT TEMPLATE BELAJAR UJIAN — deMuse
+   SCRIPT BELAJAR UJIAN (versi pribadi, tanpa fitur berbagi)
    Dipakai oleh template-belajar-ujian.html
    ============================================================ */
 
@@ -9,7 +9,7 @@
 
 // Tempel "Web app URL" dari Google Apps Script (lihat Code.gs).
 // Kalau dikosongkan "", fitur Materi Bersama & Soal dari Teman disembunyikan.
-const API_URL = "https://script.google.com/macros/s/AKfycbyptUMpQjVmeTKEJ_bE-Q9uw4OxD2OrERYJmjfM0_VHEqE2ahG3wY27Tze2rf5GQGYf/exec";
+const API_URL = "";   // versi pribadi: fitur berbagi (Materi Bersama, Bagikan, soal teman) dimatikan
 
 // Daftar jurusan di menu "Bagikan" dan filter "Materi Bersama".
 const JURUSAN = [
@@ -2223,7 +2223,7 @@ function renderAll() {
   $("backHome").classList.toggle("hidden", !has);
 
   if (!has) {
-    document.title = "Template Belajar Ujian – deMuse";
+    document.title = "Belajar Ujian";
     $("mkTitle").textContent = "Belajar Ujian Jadi Lebih Ringan";
     $("mkInfo").textContent = TEKS_AWAL;
     $("countdown").innerHTML = "";

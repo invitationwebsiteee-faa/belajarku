@@ -8,7 +8,7 @@
      Simpanan hanya dipakai kalau sedang tidak ada internet.
    - Font & pembaca PDF: pakai simpanan (jarang berubah).
    ============================================================ */
-const VERSI = "belajar-ujian-v26";
+const VERSI = "belajar-pribadi-v1";
 
 const FILE_UTAMA = [
   "./template-belajar-ujian.html",

@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Template Belajar Ujian – deMuse</title>
+<title>Belajar Ujian</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Poppins:wght@400;700&family=Open+Sans:wght@400;700&family=Merriweather:wght@400;700&family=Lora:wght@400;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
 
 <!--
-  TEMPLATE BELAJAR UJIAN — deMuse
+  BELAJAR UJIAN (versi pribadi)
   File: template-belajar-ujian.html + belajar-ujian.css + belajar-ujian.js
   (+ Code.gs untuk Google Sheets, dipasang oleh admin)
   Pengguna tidak perlu edit kode.
@@ -33,11 +33,11 @@
   <div class="wrap">
     <div class="top-line">
       <button type="button" class="btn back-btn hidden" id="backHome">← Beranda</button>
-      <span class="badge">TEMPLATE BELAJAR UJIAN · deMuse</span>
+      <span class="badge">BELAJAR UJIAN</span>
       <button type="button" class="btn install-btn hidden" id="installBtn">📲 Pasang aplikasi</button>
     </div>
     <h1 id="mkTitle">Belajar Ujian Jadi Lebih Ringan</h1>
-    <p id="mkInfo">Masukkan materi mata kuliah ya warga, nanti akan langsung jadi ringkasan, kartu hafalan, dan latihan soal.</p>
+    <p id="mkInfo">Masukkan materi mata kuliah, lalu belajar dengan ringkasan, kartu hafalan, dan latihan soal.</p>
 
     <div class="subject-bar hidden" id="subjectBar">
       <select id="subjectSelect" aria-label="Pilih mata kuliah"></select>
@@ -73,7 +73,7 @@
   <div class="steps">
     <div class="step"><b>1</b><h3>Tekan "Masukkan Materi"</h3><p>Ada di tombol merah muda di bawah ini.</p></div>
     <div class="step"><b>2</b><h3>Isi materinya</h3><p>Ketik atau tempel materinya di satu kotak. Soal latihan dibuat terpisah lewat ✍️ Buat soal.</p></div>
-    <div class="step"><b>3</b><h3>Simpan, lalu belajar</h3><p>Materi warga tersimpan utuh dan siap dipelajari.</p></div>
+    <div class="step"><b>3</b><h3>Simpan, lalu belajar</h3><p>Materi tersimpan utuh dan siap dipelajari.</p></div>
   </div>
   </div>
   <div class="row center">
@@ -166,7 +166,7 @@
     </section>
 
     <section class="panel" id="esai">
-      <div class="note">Coba jawab dulu dengan kata-kata warga sendiri, baru cek contoh jawabannya ya. Ini latihan untuk persiapan ujian💪</div>
+      <div class="note">Coba jawab dulu dengan kata-kata sendiri, baru cek contoh jawabannya ya. Ini latihan untuk persiapan ujian💪</div>
       <div class="fc-controls">
         <button class="btn pink" data-open-soal="esai">✍️ Buat soal esai</button>
       </div>
@@ -183,7 +183,7 @@
   </main>
 </div>
 
-<footer>Template belajar oleh deMuse · Materi akan tersimpan otomatis di HP/laptop warga · Semangat ujiannya! 🌸</footer>
+<footer>Materi tersimpan otomatis di HP/laptop ini · Jangan lupa cadangkan sesekali · Semangat ujiannya! 🌸</footer>
 
 <!-- ===== MODAL: MASUKKAN MATERI ===== -->
 <div class="modal hidden" id="importModal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
