@@ -238,6 +238,25 @@
         <input type="date" id="emTgl">
       </label>
     </div>
+    <div class="field">📒 Tampilan buku
+      <div class="tampilan-buku">
+        <div class="pratinjau-wrap">
+          <div id="emPratinjau" class="course-card buku mini">
+            <span class="spiral" aria-hidden="true"></span>
+            <span class="stiker-sampul" aria-hidden="true">📚</span>
+            <span class="label-buku"><span class="cc-name">Mata kuliah</span></span>
+          </div>
+        </div>
+        <div class="pilihan-buku">
+          <small>Warna sampul</small>
+          <div id="emWarna" class="swatches"></div>
+          <label class="field-kecil">Pola sampul <select id="emPola"></select></label>
+          <label class="field-kecil">Kertas materi <select id="emKertas"></select></label>
+        </div>
+      </div>
+      <small>Stiker sampul</small>
+      <div id="emStiker" class="stiker-grid"></div>
+    </div>
     <div class="field">Modul
       <small>Tekan <b>Edit isi</b> untuk mengubah judul, isi, istilah, atau soal. Modul juga bisa dipindah ke mata kuliah lain lewat pilihan "Simpan ke mata kuliah" di dalamnya.</small>
       <div id="emModul" class="em-list"></div>
@@ -360,6 +379,70 @@
       <button class="btn" data-close="soalModal">Batal</button>
       <button class="btn" id="soalSendLagi">💾 Simpan &amp; buat lagi</button>
       <button class="btn pink" id="soalSend">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: STIKER FOTO ===== -->
+<div class="modal hidden" id="stikerModal" role="dialog" aria-modal="true" aria-labelledby="psTitle">
+  <div class="modal-box">
+    <h2 id="psTitle">📷 Stiker Foto</h2>
+    <p class="muted">Ubah foto jadi stiker untuk sampul buku dan materi.</p>
+
+    <div id="psLangkah1">
+      <button type="button" class="btn pink big" id="psPilih">🖼️ Pilih foto</button>
+      <h3 class="ps-sub">Stiker foto kalian</h3>
+      <div id="psDaftar" class="ps-daftar"></div>
+    </div>
+
+    <div id="psLangkah2" class="hidden">
+      <div class="ps-kerja">
+        <canvas id="psKanvas" width="320" height="320" aria-label="Pratinjau stiker"></canvas>
+        <small class="muted">👆 Geser foto dengan jari untuk mengatur posisinya.</small>
+      </div>
+      <div class="field">Bentuk potongan
+        <div class="seg ps-bentuk">
+          <label><input type="radio" name="psBentuk" value="lingkaran" checked> ⚪ Lingkaran</label>
+          <label><input type="radio" name="psBentuk" value="kotak"> 🔲 Kotak</label>
+          <label><input type="radio" name="psBentuk" value="hati"> 💗 Hati</label>
+          <label><input type="radio" name="psBentuk" value="bintang"> ⭐ Bintang</label>
+          <label><input type="radio" name="psBentuk" value="awan"> ☁️ Awan</label>
+          <label><input type="radio" name="psBentuk" value="asli"> 🖼️ Tanpa potong</label>
+        </div>
+      </div>
+      <label class="field">🔍 Perbesar
+        <input type="range" id="psZoom" min="1" max="4" step="0.05" value="1">
+      </label>
+      <label class="field">✂️ Hapus latar belakang
+        <small>Geser ke kanan untuk menghapus latar yang warnanya polos (misalnya dinding putih). Paling bagus untuk foto dengan latar satu warna.</small>
+        <input type="range" id="psLatar" min="0" max="100" step="1" value="0">
+      </label>
+      <label class="check-row"><input type="checkbox" id="psPinggir" checked> Pinggiran putih (seperti stiker)</label>
+      <button type="button" class="link-btn" id="psGanti">🖼️ Ganti foto</button>
+    </div>
+    <input type="file" id="psFile" accept="image/*" hidden>
+
+    <div class="msg hidden" id="psMsg"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close="stikerModal">Tutup</button>
+      <button type="button" class="btn pink hidden" id="psSimpan">💾 Simpan stiker</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: HURUF SENDIRI ===== -->
+<div class="modal hidden" id="hurufModal" role="dialog" aria-modal="true" aria-labelledby="hfTitle">
+  <div class="modal-box small">
+    <h2 id="hfTitle">✨ Huruf Sendiri</h2>
+    <p class="muted">Tambahkan huruf dari file font (.ttf, .otf, .woff, .woff2). Contohnya huruf yang kalian download dari situs font gratis.</p>
+    <button type="button" class="btn pink big" id="hfPilih">📁 Pilih file huruf</button>
+    <input type="file" id="hfFile" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden>
+    <div class="msg hidden" id="hfMsg"></div>
+    <h3 class="ps-sub">Huruf kalian</h3>
+    <div id="hfDaftar" class="hf-daftar"></div>
+    <p class="tip">💡 Pilih file huruf ukuran kecil (maks 1,5 MB), biasanya yang bernama "Regular". Pastikan hurufnya boleh dipakai (lihat keterangan lisensi di situs download-nya).</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close="hurufModal">Tutup</button>
     </div>
   </div>
 </div>

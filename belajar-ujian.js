@@ -200,7 +200,7 @@ function closeModal(id) {
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeModal(b.dataset.close)));
 // Jendela tempat mengetik (materi, soal, bagikan) hanya ditutup lewat tombol, tidak lewat klik di luar
 // atau tombol Esc, supaya tidak tertutup tanpa sengaja saat memblok tulisan.
-const MODAL_ISIAN = new Set(["importModal", "soalModal", "shareModal", "editMkModal"]);
+const MODAL_ISIAN = new Set(["importModal", "soalModal", "shareModal", "editMkModal", "stikerModal", "hurufModal"]);
 let tekanDiLatar = null;
 document.querySelectorAll(".modal").forEach((m) => {
   m.addEventListener("mousedown", (e) => { tekanDiLatar = e.target === m ? m : null; });
@@ -431,6 +431,46 @@ function toAnswerIndex(jawaban, pilihan) {
   return pilihan.findIndex((p) => p.trim().toLowerCase() === s.toLowerCase());
 }
 
+/* ============================================================
+   TAMPILAN BUKU CATATAN: sampul, pola, stiker, kertas
+   ============================================================ */
+const WARNA_SAMPUL = { biru: "#bcd7f2", butter: "#fde7a3", pink: "#f9c3d6", mint: "#c7ebd9", lavender: "#dacdf4", peach: "#ffd3b8", toska: "#b8e3e6", krem: "#efe6d8" };
+const NAMA_WARNA = { biru: "Biru", butter: "Butter", pink: "Pink", mint: "Mint", lavender: "Lavender", peach: "Peach", toska: "Toska", krem: "Krem" };
+const POLA_SAMPUL = { polos: "Polos", garis: "Garis miring", titik: "Polkadot", kotak: "Kotak-kotak" };
+const STIKER = ["📚", "🌸", "⭐", "🍓", "🌷", "☁️", "🐰", "🧸", "🍀", "🎀", "💡", "🌙", "🦋", "🍋", "🌈", "✏️"];
+const KERTAS = { garis: "Bergaris", kotak: "Kotak-kotak", titik: "Titik-titik", polos: "Polos" };
+/* ---------- Stiker foto buatan sendiri ---------- */
+const STIKER_FOTO_KEY = "demuse-belajar-stiker-foto";
+const MAKS_STIKER_FOTO = 40;
+let stikerFoto = readStore(STIKER_FOTO_KEY, []);
+if (!Array.isArray(stikerFoto)) stikerFoto = [];
+const cariStikerFoto = (id) => stikerFoto.find((x) => x && x.id === id);
+const htmlStikerFoto = (id, kelas = "stiker-foto", untukEditor = false) => {
+  const f = cariStikerFoto(id);
+  if (!f || !/^data:image\/(png|webp|jpeg);base64,[a-z0-9+/=]+$/i.test(f.data)) return "";
+  return `<img class="${kelas}" src="${f.data}" alt="stiker" data-st="${esc(id)}"${untukEditor ? ' contenteditable="false" draggable="false"' : ""}>`;
+};
+function tampilStiker(st) {
+  if (String(st).startsWith("foto:")) return htmlStikerFoto(st.slice(5), "stiker-foto sampul") || "📚";
+  return esc(st);
+}
+function bukuValid(b) {
+  if (!b || typeof b !== "object") return null;
+  return {
+    warna: WARNA_SAMPUL[b.warna] ? b.warna : "biru",
+    pola: POLA_SAMPUL[b.pola] ? b.pola : "polos",
+    stiker: STIKER.includes(b.stiker) || /^foto:[a-z0-9]{4,20}$/.test(String(b.stiker)) ? b.stiker : "📚",
+    kertas: KERTAS[b.kertas] ? b.kertas : "garis"
+  };
+}
+// mata kuliah tanpa pilihan: warna dipilih otomatis dari namanya, jadi tiap buku beda warna
+function bukuDari(s, id) {
+  if (s && bukuValid(s.buku)) return bukuValid(s.buku);
+  const kunci = Object.keys(WARNA_SAMPUL);
+  let h = 0; for (const c of String(id || (s && s.mataKuliah) || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return { warna: kunci[h % kunci.length], pola: ["polos", "titik", "garis", "kotak"][(h >>> 3) % 4], stiker: STIKER[(h >>> 5) % STIKER.length], kertas: "garis" };
+}
+
 function normalize(obj) {
   let d = obj;
   if (Array.isArray(d)) d = { modul: d };
@@ -462,6 +502,7 @@ function normalize(obj) {
     info: str(d.info),
     tanggalUjian: str(d.tanggalUjian),
     catatan: str(d.catatan),
+    ...(bukuValid(d.buku) ? { buku: bukuValid(d.buku) } : {}),
     modul
   };
 }
@@ -573,8 +614,30 @@ function hapusModul(id, nomor) {
 }
 
 /* ---------- Menu Edit mata kuliah (nama, kode, tanggal ujian, daftar modul) ---------- */
+function isiPilihanStikerSampul(pilih) {
+  const semua = [...STIKER, ...stikerFoto.map((f) => "foto:" + f.id)];
+  if (!semua.includes(pilih)) pilih = "📚";
+  $("emStiker").innerHTML = semua.map((e) => `<label class="stiker-pilih"><input type="radio" name="emStiker" value="${esc(e)}" ${e === pilih ? "checked" : ""}><span>${tampilStiker(e)}</span></label>`).join("") +
+    `<button type="button" class="stiker-tambah" data-buka-stiker-foto>📷<small>Foto</small></button>`;
+}
+function pratinjauBuku() {
+  const w = (document.querySelector('input[name="emWarna"]:checked') || {}).value || "biru";
+  const st = (document.querySelector('input[name="emStiker"]:checked') || {}).value || "📚";
+  const el = $("emPratinjau");
+  el.className = "course-card buku mini pola-" + $("emPola").value;
+  el.style.setProperty("--sampul", WARNA_SAMPUL[w]);
+  el.querySelector(".stiker-sampul").innerHTML = tampilStiker(st);
+  el.querySelector(".cc-name").textContent = $("emNama").value.trim() || "Mata kuliah";
+}
 function isiEditMk() {
   const d = current(); if (!d) return;
+  const bk = bukuDari(d, library.active);
+  $("emWarna").innerHTML = Object.keys(WARNA_SAMPUL).map((k) => `<label class="swatch" title="${NAMA_WARNA[k]}" style="--w:${WARNA_SAMPUL[k]}"><input type="radio" name="emWarna" value="${k}" ${k === bk.warna ? "checked" : ""}><span>${NAMA_WARNA[k]}</span></label>`).join("");
+  isiPilihanStikerSampul(bk.stiker);
+  $("emPola").innerHTML = Object.entries(POLA_SAMPUL).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  $("emKertas").innerHTML = Object.entries(KERTAS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  $("emPola").value = bk.pola; $("emKertas").value = bk.kertas;
+  setTimeout(pratinjauBuku, 0);
   $("emNama").value = d.mataKuliah; $("emKode").value = d.kode || "";
   $("emTgl").value = d.tanggalUjian ? d.tanggalUjian.slice(0, 10) : "";
   showMsg("emMsg", "");
@@ -588,6 +651,7 @@ function isiEditMk() {
     </div>`).join("") : `<p class="muted">Belum ada modul.</p>`;
 }
 $("editMkBtn").addEventListener("click", () => { isiEditMk(); openModal("editMkModal"); });
+["emWarna", "emStiker", "emPola", "emNama"].forEach((id) => $(id).addEventListener(id === "emNama" ? "input" : "change", pratinjauBuku));
 $("emModul").addEventListener("click", (e) => {
   const ed = e.target.closest("[data-edit-modul]"), del = e.target.closest("[data-hapus-modul]");
   if (ed) { const id = library.active; closeModal("editMkModal"); setTimeout(() => bukaEditModul(id, Number(ed.dataset.editModul)), 80); }
@@ -600,6 +664,12 @@ $("emSimpan").addEventListener("click", () => {
   d.mataKuliah = nama;
   d.kode = $("emKode").value.trim();
   d.tanggalUjian = $("emTgl").value ? $("emTgl").value + "T07:00" : "";
+  d.buku = bukuValid({
+    warna: (document.querySelector('input[name="emWarna"]:checked') || {}).value,
+    pola: $("emPola").value,
+    stiker: (document.querySelector('input[name="emStiker"]:checked') || {}).value,
+    kertas: $("emKertas").value
+  });
   saveLibrary(); closeModal("editMkModal"); renderAll();
   toast("✅ Mata kuliah diperbarui.");
 });
@@ -661,7 +731,27 @@ function namaHuruf(raw) {
   const f = PETA_HURUF.get(pertama);
   return f && f.nama !== "Nunito" ? f.nama : null;     // Nunito = huruf bawaan, tidak perlu ditandai
 }
-const OPSI_HURUF = DAFTAR_HURUF.map(([nama, label, css]) => `<option value="${nama}" style="font-family:${css}">${label}</option>`).join("");
+/* ---------- Huruf tambahan dari file sendiri (.ttf / .otf / .woff) ---------- */
+const HURUF_SAYA_KEY = "demuse-belajar-huruf-saya";
+let hurufSaya = readStore(HURUF_SAYA_KEY, []);
+if (!Array.isArray(hurufSaya)) hurufSaya = [];
+const namaAmanHuruf = (n) => String(n || "").replace(/\.[a-z0-9]+$/i, "").replace(/[_\-]+/g, " ").replace(/[^A-Za-z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 30);
+function daftarkanHuruf(h) {
+  const nama = namaAmanHuruf(h.nama);
+  if (!nama || !/^data:[a-z\/\-+.]*;base64,[A-Za-z0-9+/=]+$/.test(h.data)) return Promise.reject(new Error("rusak"));
+  PETA_HURUF.set(nama.toLowerCase(), { nama, label: "✨ " + nama, css: `'${nama}', 'Nunito', sans-serif`, saya: true });
+  if (typeof FontFace === "undefined") return Promise.resolve();
+  const ff = new FontFace(nama, `url(${h.data})`);
+  return ff.load().then((f) => { document.fonts.add(f); });
+}
+hurufSaya.forEach((h) => daftarkanHuruf(h).catch(() => {}));
+function opsiHuruf() {
+  return [...PETA_HURUF.values()].map((f) => `<option value="${esc(f.nama)}" style="font-family:${esc(f.css)}">${esc(f.label)}</option>`).join("") +
+    `<option value="__huruf">➕ Tambah / atur huruf sendiri…</option>`;
+}
+function segarkanPilihanHuruf() {
+  document.querySelectorAll("[data-fontsel]").forEach((p) => { const v = p.value; p.innerHTML = opsiHuruf(); p.value = PETA_HURUF.has(String(v).toLowerCase()) ? v : "Nunito"; });
+}
 
 /* ---------- Ukuran huruf, warna huruf, stabilo, jarak baris ----------
    Disimpan sebagai tanda tersembunyi: ⟦z:4⟧ukuran⟦/z⟧, ⟦w:#c62828⟧warna⟦/w⟧, ⟦s:#fff176⟧stabilo⟦/s⟧,
@@ -751,10 +841,11 @@ function editorKeTeks(root, opsi = {}) {
   const BLOK = /^(DIV|P|H1|H2|H3|H4|H5|H6|LI|BLOCKQUOTE|PRE|TR|SECTION|ARTICLE|HEADER|FOOTER)$/;
   const jalan = (node) => {
     node.childNodes.forEach((n) => {
-      if (n.nodeType === 3) { const t = n.nodeValue.replace(/[\r\n]+/g, " ").replace(/ /g, " "); if (t) { cur += t; habisBr = false; } return; }
+      if (n.nodeType === 3) { const t = n.nodeValue.replace(/[\r\n]+/g, " ").replace(/ /g, " ").replace(/\u200b/g, ""); if (t) { cur += t; habisBr = false; } return; }
       if (n.nodeType !== 1) return;
       const tag = n.tagName;
       if (tag === "BR") { baris(); habisBr = true; return; }
+      if (tag === "IMG") { const id = n.getAttribute("data-st"); if (id && /^[a-z0-9]{4,20}$/.test(id)) { cur += `⟦st:${id}⟧`; habisBr = false; } return; }
       if (/^(SCRIPT|STYLE|META|TITLE)$/.test(tag)) return;
       if (BLOK.test(tag)) {
         if (cur !== "") baris();
@@ -805,6 +896,12 @@ function teksKeEditor(teks, inline) {
   }).join("");
 }
 
+function isiLaci(laci) {
+  laci.innerHTML = STIKER_TULISAN.map((e) => `<button type="button" data-stiker="${e}" aria-label="Stiker ${e}">${e}</button>`).join("") +
+    stikerFoto.map((f) => `<button type="button" class="foto" data-stiker="foto:${esc(f.id)}" aria-label="Stiker foto">${htmlStikerFoto(f.id, "stiker-foto kecil")}</button>`).join("") +
+    `<button type="button" class="tambah" data-stiker="__foto" aria-label="Buat stiker dari foto">📷<small>Foto</small></button>`;
+}
+const STIKER_TULISAN = ["⭐", "🌸", "📌", "💡", "✅", "❗", "❓", "❤️", "🍓", "🌷", "🎀", "🐰", "🧸", "☁️", "🌈", "📝", "👉", "🔥"];
 function enhanceRich(ta, kind = "block") {
   if (!ta || ta.dataset.rich) return;
   ta.dataset.rich = kind;
@@ -815,7 +912,8 @@ function enhanceRich(ta, kind = "block") {
     <button type="button" data-fmt="h2" title="Sub-judul" aria-pressed="false"><span class="fh2">Sub-judul</span></button>` : "") +
     `<button type="button" data-fmt="b" title="Tebal (Ctrl+B)" aria-pressed="false"><b>B</b> <small>Tebal</small></button>
     <button type="button" data-fmt="i" title="Miring (Ctrl+I)" aria-pressed="false"><i>I</i> <small>Miring</small></button>
-    <select class="font-sel" data-fontsel title="Jenis huruf" aria-label="Jenis huruf">${OPSI_HURUF}</select>
+    <button type="button" data-stiker-buka title="Tempel stiker" aria-expanded="false">🌟 <small>Stiker</small></button>
+    <select class="font-sel" data-fontsel title="Jenis huruf" aria-label="Jenis huruf">${opsiHuruf()}</select>
     <select class="font-sel" data-gaya="z" title="Ukuran huruf" aria-label="Ukuran huruf">${opsiDari(DAFTAR_UKURAN)}</select>
     <select class="font-sel" data-gaya="w" title="Warna huruf" aria-label="Warna huruf">${opsiDari(DAFTAR_WARNA)}</select>
     <select class="font-sel" data-gaya="s" title="Stabilo" aria-label="Stabilo">${opsiDari(DAFTAR_STABILO)}</select>` +
@@ -827,6 +925,10 @@ function enhanceRich(ta, kind = "block") {
   ed.setAttribute("aria-multiline", "true");
   ed.dataset.placeholder = ta.placeholder || "";
   if (ta.style.minHeight) ed.style.minHeight = ta.style.minHeight;
+  const laci = document.createElement("div");
+  laci.className = "laci-stiker hidden";
+  laci.innerHTML = STIKER_TULISAN.map((e) => `<button type="button" data-stiker="${e}" aria-label="Stiker ${e}">${e}</button>`).join("");
+  bar.appendChild(laci);
   ta.parentNode.insertBefore(bar, ta);
   ta.parentNode.insertBefore(ed, ta);
   ta.classList.add("hidden");
@@ -842,7 +944,7 @@ function enhanceRich(ta, kind = "block") {
   ed.innerHTML = teksKeEditor(nilaiAsli.get.call(ta), inline);
   ed.addEventListener("input", () => {
     ta._sinkron = true; ta.value = editorKeTeks(ed); ta._sinkron = false;
-    if (!ed.textContent.trim() && !ed.querySelector("h2,h3")) ed.innerHTML = "";
+    if (!ed.textContent.trim() && !ed.querySelector("h2,h3,img")) ed.innerHTML = "";
     perbaruiTombol();
   });
   // tempel: ambil tebal/miring/judul saja, buang gaya lain dari Word/PDF/web
@@ -944,6 +1046,12 @@ function aturJarak(ed, v) {
 document.addEventListener("change", (e) => {
   const pilih = e.target.closest && e.target.closest("[data-fontsel],[data-gaya]");
   if (!pilih) return;
+  if (pilih.value === "__huruf") {        // bukan huruf: buka pengaturan huruf sendiri
+    let v = "Nunito"; try { v = namaHuruf(document.queryCommandValue("fontName")) || "Nunito"; } catch (er) {}
+    pilih.value = v;
+    bukaHurufSaya();
+    return;
+  }
   const bar = pilih.closest(".rich-tools"), ed = bar && bar.nextElementSibling;
   if (!ed || !ed.classList.contains("editor")) return;
   ed.focus();
@@ -990,7 +1098,37 @@ document.addEventListener("click", (e) => {
   ed.dispatchEvent(new Event("input", { bubbles: true }));
 });
 // tombol format tidak mencuri kursor dari kotak tulisan
-document.addEventListener("mousedown", (e) => { if (e.target.closest("[data-fmt]")) e.preventDefault(); });
+document.addEventListener("mousedown", (e) => { if (e.target.closest("[data-fmt],[data-stiker],[data-stiker-buka]")) e.preventDefault(); });
+document.addEventListener("click", (e) => {
+  const buka = e.target.closest("[data-stiker-buka]");
+  if (buka) {
+    const laci = buka.closest(".rich-tools").querySelector(".laci-stiker");
+    isiLaci(laci);
+    laci.classList.toggle("hidden");
+    buka.setAttribute("aria-expanded", laci.classList.contains("hidden") ? "false" : "true");
+    return;
+  }
+  const st = e.target.closest("[data-stiker]");
+  if (!st) return;
+  if (st.dataset.stiker === "__foto") { bukaStikerFoto(); return; }
+  const bar = st.closest(".rich-tools"), ed = bar && bar.nextElementSibling;
+  if (!ed || !ed.classList.contains("editor")) return;
+  const sel = window.getSelection();
+  if (editorAktif() !== ed) {
+    ed.focus();
+    if (ed._range && ed.contains(ed._range.startContainer)) { sel.removeAllRanges(); sel.addRange(ed._range); }
+    else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
+  }
+  if (st.dataset.stiker.startsWith("foto:")) {
+    const html = htmlStikerFoto(st.dataset.stiker.slice(5), "stiker-foto", true);
+    if (html && !document.execCommand("insertHTML", false, html + "\u200b")) {
+      const r = sel.getRangeAt(0); r.deleteContents(); const frag = r.createContextualFragment(html); const img = frag.firstChild; r.insertNode(frag); r.setStartAfter(img); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+    }
+  } else if (!document.execCommand("insertText", false, st.dataset.stiker)) {
+    const r = sel.getRangeAt(0); r.deleteContents(); const t = document.createTextNode(st.dataset.stiker); r.insertNode(t); r.setStartAfter(t); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+  }
+  ed.dispatchEvent(new Event("input", { bubbles: true }));
+});
 document.addEventListener("click", (e) => {
   const lab = e.target.closest("label.field");
   if (!lab || e.target.closest(".editor, .rich-tools, input, select, button")) return;
@@ -1431,6 +1569,7 @@ function fmtInline(html, untukEditor = false) {
     sebelum = h;
     h = h.replace(/⟦([fzsw]):([^⟦⟧]{1,40})⟧([^⟦⟧]*?)⟦\/\1⟧/g, (_, k, v, t) => gayaHtml(k, v, t, untukEditor));
   } while (h !== sebelum);
+  h = h.replace(/⟦st:([a-z0-9]{4,20})⟧/g, (_, id) => htmlStikerFoto(id, "stiker-foto", untukEditor));
   h = h.replace(/⟦[^⟦⟧]{0,40}⟧/g, "");    // tanda yang tidak lengkap dibuang, tidak pernah terlihat
   return h
     // tebal + miring sekaligus: ***teks***
@@ -2111,11 +2250,16 @@ function renderBeranda() {
   $("tryExample").classList.toggle("hidden", ids.length > 0);
   $("courseCards").innerHTML = ids.map((id) => {
     const s = library.subjects[id], p = persenProgres(id), hari = sisaHari(s.tanggalUjian);
-    return `<button type="button" class="course-card" data-buka="${esc(id)}">
-      <span class="cc-name">📘 ${esc(s.mataKuliah)}</span>
-      <span class="cc-meta">${[s.kode, s.modul.length + " modul"].filter(Boolean).map(esc).join(" · ")}${hari ? ` · <b>${hari}</b>` : ""}</span>
-      <span class="cc-bar"><i style="width:${p}%"></i></span>
-      <span class="cc-prog">Progres ${p}% <span class="cc-go">Buka →</span></span>
+    const b = bukuDari(s, id);
+    return `<button type="button" class="course-card buku pola-${b.pola}" data-buka="${esc(id)}" style="--sampul:${WARNA_SAMPUL[b.warna]}" aria-label="Buka ${esc(s.mataKuliah)}">
+      <span class="spiral" aria-hidden="true"></span>
+      <span class="stiker-sampul" aria-hidden="true">${tampilStiker(b.stiker)}</span>
+      <span class="label-buku">
+        <span class="cc-name">${esc(s.mataKuliah)}</span>
+        <span class="cc-meta">${[s.kode, s.modul.length + " modul"].filter(Boolean).map(esc).join(" · ")}</span>
+      </span>
+      ${hari ? `<span class="cc-hari">${hari}</span>` : ""}
+      <span class="cc-bawah"><span class="cc-bar"><i style="width:${p}%"></i></span><span class="cc-prog">${p}% selesai</span></span>
     </button>`;
   }).join("");
 }
@@ -2225,6 +2369,7 @@ function renderAll() {
   if (!has) {
     document.title = "Belajar Ujian";
     $("mkTitle").textContent = "Belajar Ujian Jadi Lebih Ringan";
+    document.body.classList.remove("buka-buku");
     $("mkInfo").textContent = TEKS_AWAL;
     $("countdown").innerHTML = "";
     renderBeranda();
@@ -2233,6 +2378,10 @@ function renderAll() {
 
   document.title = "Belajar " + d.mataKuliah;
   $("mkTitle").textContent = d.mataKuliah;
+  const bk = bukuDari(d, library.active);
+  document.body.style.setProperty("--sampul", WARNA_SAMPUL[bk.warna]);
+  document.body.classList.add("buka-buku");
+  $("modulList").className = "kertas-" + bk.kertas;
   $("mkInfo").textContent = [d.kode, d.info].filter(Boolean).join(" · ");
   $("catatanUmum").textContent = d.catatan ? "💡 " + d.catatan : "";
   $("catatanUmum").classList.toggle("hidden", !d.catatan);
@@ -2298,4 +2447,217 @@ $("installBtn").addEventListener("click", async () => {
 window.addEventListener("appinstalled", () => {
   $("installBtn").classList.add("hidden");
   toast("🎉 Aplikasi terpasang! Cari ikon \"Belajar Ujian\" di layar HP kalian.");
+});
+
+
+/* ============================================================
+   PEMBUAT STIKER FOTO: pilih foto → atur potongan → simpan
+   ============================================================ */
+const UK_STIKER = 320;
+const ps = { img: null, zoom: 1, x: 0, y: 0, bentuk: "lingkaran", latar: 0, pinggir: true };
+function bukaStikerFoto() {
+  ps.img = null;
+  $("psLangkah1").classList.remove("hidden");
+  $("psLangkah2").classList.add("hidden");
+  $("psSimpan").classList.add("hidden");
+  renderDaftarStikerFoto();
+  showMsg("psMsg", "");
+  openModal("stikerModal");
+}
+document.addEventListener("click", (e) => { if (e.target.closest("[data-buka-stiker-foto]")) bukaStikerFoto(); });
+function renderDaftarStikerFoto() {
+  $("psDaftar").innerHTML = stikerFoto.length
+    ? stikerFoto.map((f) => `<div class="ps-item">${htmlStikerFoto(f.id, "stiker-foto")}<button type="button" class="link-btn" data-hapus-stiker="${esc(f.id)}">🗑️ Hapus</button></div>`).join("")
+    : `<p class="muted">Belum ada stiker foto.</p>`;
+}
+$("psDaftar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-hapus-stiker]"); if (!b) return;
+  if (!confirm("Hapus stiker ini? Stiker yang sudah ditempel di materi juga akan hilang.")) return;
+  stikerFoto = stikerFoto.filter((f) => f.id !== b.dataset.hapusStiker);
+  writeStore(STIKER_FOTO_KEY, stikerFoto);
+  renderDaftarStikerFoto(); segarkanStiker();
+});
+function tampilLangkah2(on) {
+  $("psLangkah1").classList.toggle("hidden", on);
+  $("psLangkah2").classList.toggle("hidden", !on);
+  $("psSimpan").classList.toggle("hidden", !on);
+}
+$("psPilih").addEventListener("click", () => $("psFile").click());
+$("psGanti").addEventListener("click", () => $("psFile").click());
+$("psFile").addEventListener("change", () => {
+  const f = $("psFile").files[0]; $("psFile").value = "";
+  if (!f) return;
+  if (!/^image\//.test(f.type)) { showMsg("psMsg", "😕 Pilih file foto (JPG/PNG) ya."); return; }
+  const img = new Image();
+  img.onload = () => {
+    ps.img = img; ps.zoom = 1; ps.x = 0; ps.y = 0; ps.latar = 0;
+    $("psZoom").value = 1; $("psLatar").value = 0;
+    tampilLangkah2(true); showMsg("psMsg", "");
+    gambarStiker();
+  };
+  img.onerror = () => showMsg("psMsg", "😕 Foto ini tidak bisa dibuka. Coba foto lain (JPG/PNG).");
+  img.src = URL.createObjectURL(f);
+});
+document.querySelectorAll('input[name="psBentuk"]').forEach((r) => r.addEventListener("change", () => { ps.bentuk = r.value; gambarStiker(); }));
+$("psZoom").addEventListener("input", () => { ps.zoom = Number($("psZoom").value); gambarStiker(); });
+$("psLatar").addEventListener("input", () => { ps.latar = Number($("psLatar").value); gambarStiker(); });
+$("psPinggir").addEventListener("change", () => { ps.pinggir = $("psPinggir").checked; gambarStiker(); });
+(() => {   // geser foto dengan jari / mouse
+  let tarik = null;
+  const c = $("psKanvas");
+  c.addEventListener("pointerdown", (e) => { if (!ps.img) return; tarik = { x: e.clientX, y: e.clientY, ox: ps.x, oy: ps.y }; try { c.setPointerCapture(e.pointerId); } catch (er) {} });
+  c.addEventListener("pointermove", (e) => {
+    if (!tarik) return;
+    const skala = UK_STIKER / c.getBoundingClientRect().width;
+    ps.x = tarik.ox + (e.clientX - tarik.x) * skala; ps.y = tarik.oy + (e.clientY - tarik.y) * skala;
+    gambarStiker();
+  });
+  const lepas = () => (tarik = null);
+  c.addEventListener("pointerup", lepas); c.addEventListener("pointercancel", lepas);
+})();
+function jalurBentuk(ctx, bentuk, S, m) {
+  const w = S - 2 * m, c = S / 2;
+  ctx.beginPath();
+  if (bentuk === "lingkaran") ctx.arc(c, c, w / 2, 0, Math.PI * 2);
+  else if (bentuk === "kotak") { const r = w * 0.2, x = m, y = m; ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + w, r); ctx.arcTo(x + w, y + w, x, y + w, r); ctx.arcTo(x, y + w, x, y, r); ctx.arcTo(x, y, x + w, y, r); }
+  else if (bentuk === "hati") {
+    ctx.moveTo(c, m + w * 0.97);
+    ctx.bezierCurveTo(m - w * 0.02, m + w * 0.6, m + w * 0.02, m + w * 0.05, c - w * 0.24, m + w * 0.06);
+    ctx.bezierCurveTo(c - w * 0.08, m + w * 0.06, c, m + w * 0.18, c, m + w * 0.26);
+    ctx.bezierCurveTo(c, m + w * 0.18, c + w * 0.08, m + w * 0.06, c + w * 0.24, m + w * 0.06);
+    ctx.bezierCurveTo(m + w * 0.98, m + w * 0.05, m + w * 1.02, m + w * 0.6, c, m + w * 0.97);
+  } else if (bentuk === "bintang") {
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? w * 0.25 : w * 0.52, a = -Math.PI / 2 + (i * Math.PI) / 5;
+      ctx.lineTo(c + Math.cos(a) * r, c + w * 0.05 + Math.sin(a) * r);
+    }
+  } else if (bentuk === "awan") {
+    ctx.arc(c - w * 0.24, c + w * 0.08, w * 0.24, Math.PI * 0.5, Math.PI * 1.5);
+    ctx.arc(c - w * 0.04, c - w * 0.12, w * 0.28, Math.PI * 1.05, Math.PI * 1.85);
+    ctx.arc(c + w * 0.24, c + w * 0.05, w * 0.25, Math.PI * 1.4, Math.PI * 0.5);
+    ctx.lineTo(c - w * 0.24, c + w * 0.32);
+  } else ctx.rect(0, 0, S, S);
+  ctx.closePath();
+}
+// hapus latar polos: mulai dari tepi foto, warna yang mirip latar dibuat tembus pandang
+function hapusLatar(ctx, S, tol) {
+  const data = ctx.getImageData(0, 0, S, S), p = data.data;
+  const tepi = [];
+  for (let i = 0; i < S; i++) tepi.push([i, 0], [i, S - 1], [0, i], [S - 1, i]);
+  const kumpul = tepi.map(([x, y]) => (y * S + x) * 4).filter((k) => p[k + 3] > 200);
+  if (!kumpul.length) return;
+  const rata = [0, 1, 2].map((j) => kumpul.reduce((a, k) => a + p[k + j], 0) / kumpul.length);
+  const batas = (tol / 100) * 170, lunak = Math.max(1, batas * 0.35);
+  const jarak = (k) => Math.hypot(p[k] - rata[0], p[k + 1] - rata[1], p[k + 2] - rata[2]);
+  const lihat = new Uint8Array(S * S), antre = [];
+  tepi.forEach(([x, y]) => { const i = y * S + x; if (!lihat[i] && jarak(i * 4) <= batas) { lihat[i] = 1; antre.push(i); } });
+  while (antre.length) {
+    const i = antre.pop(), k = i * 4, d = jarak(k);
+    p[k + 3] = d < batas - lunak ? 0 : Math.round(p[k + 3] * Math.min(1, (d - (batas - lunak)) / lunak));
+    const x = i % S, y = (i / S) | 0;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (nx < 0 || ny < 0 || nx >= S || ny >= S) continue;
+      const j = ny * S + nx;
+      if (!lihat[j] && jarak(j * 4) <= batas) { lihat[j] = 1; antre.push(j); }
+    }
+  }
+  ctx.putImageData(data, 0, 0);
+}
+function buatStiker() {
+  const S = UK_STIKER, m = ps.pinggir ? 16 : 4;
+  const kv = () => { const c = document.createElement("canvas"); c.width = c.height = S; return c; };
+  const foto = kv(), fc = foto.getContext("2d");
+  const img = ps.img, dasar = Math.max(S / img.width, S / img.height) * ps.zoom;
+  const w = img.width * dasar, h = img.height * dasar;
+  fc.drawImage(img, (S - w) / 2 + ps.x, (S - h) / 2 + ps.y, w, h);
+  if (ps.latar > 0) hapusLatar(fc, S, ps.latar);
+  const pot = kv(), pc = pot.getContext("2d");
+  if (ps.bentuk !== "asli") { jalurBentuk(pc, ps.bentuk, S, m); pc.clip(); }
+  pc.drawImage(foto, 0, 0);
+  const hasil = kv(), hc = hasil.getContext("2d");
+  if (ps.pinggir) {
+    const tebal = 10;
+    for (let a = 0; a < 24; a++) hc.drawImage(pot, Math.cos((a / 24) * Math.PI * 2) * tebal, Math.sin((a / 24) * Math.PI * 2) * tebal);
+    hc.globalCompositeOperation = "source-in"; hc.fillStyle = "#ffffff"; hc.fillRect(0, 0, S, S);
+    hc.globalCompositeOperation = "source-over";
+  }
+  hc.drawImage(pot, 0, 0);
+  return hasil;
+}
+function gambarStiker() {
+  if (!ps.img) return;
+  const c = $("psKanvas"), ctx = c.getContext("2d");
+  c.width = c.height = UK_STIKER;
+  ctx.clearRect(0, 0, UK_STIKER, UK_STIKER);
+  ctx.drawImage(buatStiker(), 0, 0);
+}
+$("psSimpan").addEventListener("click", () => {
+  if (!ps.img) return;
+  if (stikerFoto.length >= MAKS_STIKER_FOTO) { showMsg("psMsg", `Stiker foto sudah ${MAKS_STIKER_FOTO}. Hapus yang tidak dipakai dulu ya.`); return; }
+  const kecil = document.createElement("canvas"); kecil.width = kecil.height = 200;
+  kecil.getContext("2d").drawImage(buatStiker(), 0, 0, 200, 200);
+  let data = kecil.toDataURL("image/webp", 0.85);
+  if (!data.startsWith("data:image/webp")) data = kecil.toDataURL("image/png");
+  stikerFoto.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data });
+  if (!writeStore(STIKER_FOTO_KEY, stikerFoto)) {
+    stikerFoto.pop();
+    showMsg("psMsg", "😕 Penyimpanan HP penuh. Hapus beberapa stiker foto dulu ya.");
+    return;
+  }
+  toast("🎉 Stiker foto tersimpan. Bisa dipilih di 🌟 Stiker dan di sampul buku.");
+  ps.img = null; tampilLangkah2(false);
+  renderDaftarStikerFoto(); segarkanStiker();
+});
+function segarkanStiker() {
+  if (!$("editMkModal").classList.contains("hidden")) {
+    const pilih = (document.querySelector('input[name="emStiker"]:checked') || {}).value;
+    isiPilihanStikerSampul(pilih); pratinjauBuku();
+  }
+  document.querySelectorAll(".laci-stiker:not(.hidden)").forEach(isiLaci);
+  renderAll();
+}
+
+
+/* ============================================================
+   HURUF SENDIRI: tambah dari file font, hapus
+   ============================================================ */
+const MAKS_FILE_HURUF = 1.5 * 1024 * 1024;
+function bukaHurufSaya() { renderHurufSaya(); showMsg("hfMsg", ""); openModal("hurufModal"); }
+function renderHurufSaya() {
+  $("hfDaftar").innerHTML = hurufSaya.length
+    ? hurufSaya.map((h, i) => { const n = namaAmanHuruf(h.nama); return `<div class="hf-item"><span style="font-family:'${esc(n)}', 'Nunito', sans-serif">${esc(n)} — Belajar itu menyenangkan</span><button type="button" class="link-btn" data-hapus-huruf="${i}">🗑️ Hapus</button></div>`; }).join("")
+    : `<p class="muted">Belum ada huruf tambahan.</p>`;
+}
+$("hfPilih").addEventListener("click", () => $("hfFile").click());
+$("hfFile").addEventListener("change", async () => {
+  const f = $("hfFile").files[0]; $("hfFile").value = "";
+  if (!f) return;
+  if (!/\.(ttf|otf|woff2?)$/i.test(f.name)) { showMsg("hfMsg", "😕 Pilih file huruf yang berakhiran .ttf, .otf, .woff, atau .woff2 ya."); return; }
+  if (f.size > MAKS_FILE_HURUF) { showMsg("hfMsg", "😕 File huruf ini terlalu besar (maks 1,5 MB). Coba versi .woff2 atau pilih satu ketebalan saja, misalnya \"Regular\"."); return; }
+  const nama = namaAmanHuruf(f.name);
+  if (!nama) { showMsg("hfMsg", "😕 Nama file huruf tidak bisa dipakai. Ganti nama file-nya dulu, misalnya \"HurufLucu.ttf\"."); return; }
+  if (PETA_HURUF.has(nama.toLowerCase()) && !hurufSaya.some((h) => namaAmanHuruf(h.nama).toLowerCase() === nama.toLowerCase())) { showMsg("hfMsg", "Nama huruf ini sudah ada di daftar."); return; }
+  showMsg("hfMsg", "⏳ Memasang huruf...", "ok");
+  const data = await new Promise((ok, gagal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = gagal; r.readAsDataURL(f); });
+  const baru = { nama, data: String(data).replace(/^data:[^;]*;/, "data:font/" + f.name.split(".").pop().toLowerCase() + ";") };
+  try { await daftarkanHuruf(baru); } catch (err) { PETA_HURUF.delete(nama.toLowerCase()); showMsg("hfMsg", "😕 File ini bukan huruf yang bisa dipakai. Coba file lain."); return; }
+  const lama = hurufSaya.findIndex((h) => namaAmanHuruf(h.nama).toLowerCase() === nama.toLowerCase());
+  if (lama >= 0) hurufSaya[lama] = baru; else hurufSaya.push(baru);
+  if (!writeStore(HURUF_SAYA_KEY, hurufSaya)) {
+    if (lama >= 0) hurufSaya = readStore(HURUF_SAYA_KEY, []); else hurufSaya.pop();
+    showMsg("hfMsg", "😕 Penyimpanan HP penuh, huruf tidak bisa disimpan. Hapus huruf atau stiker foto yang tidak dipakai dulu.");
+    return;
+  }
+  showMsg("hfMsg", `✅ Huruf "${nama}" siap dipakai. Pilih di daftar jenis huruf (ada tanda ✨).`, "ok");
+  renderHurufSaya(); segarkanPilihanHuruf(); renderAll();
+});
+$("hfDaftar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-hapus-huruf]"); if (!b) return;
+  const h = hurufSaya[Number(b.dataset.hapusHuruf)]; if (!h) return;
+  const nama = namaAmanHuruf(h.nama);
+  if (!confirm(`Hapus huruf "${nama}"? Tulisan yang memakai huruf ini akan kembali ke huruf biasa.`)) return;
+  hurufSaya.splice(Number(b.dataset.hapusHuruf), 1);
+  writeStore(HURUF_SAYA_KEY, hurufSaya);
+  PETA_HURUF.delete(nama.toLowerCase());
+  renderHurufSaya(); segarkanPilihanHuruf(); renderAll();
 });
