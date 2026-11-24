@@ -306,8 +306,9 @@ function parseSederhana(text) {
       .replace(/^\s*>\s*/, "").trim();
     const fl = fmt.replace(/^#+\s*/, "").replace(/^=+\s*|\s*=+$/g, "").trim();
     // line = versi polos, untuk mengenali judul seperti MODUL 1: / RINGKASAN:
-    const line = fl.replace(/⟦[^⟦⟧]{0,40}⟧/g, "").replace(/\*\*|__/g, "").trim();
-    if (!line) { if (section === "bebas") flushPara(); if (section === "ringkasan" && mod && mod.ringkasan && !mod.ringkasan.endsWith("\n\n")) mod.ringkasan += "\n"; continue; }
+    const line = fl.replace(/⟦[^⟦⟧]{0,60}⟧/g, "").replace(/\*\*|__/g, "").trim();
+    const hanyaStiker = !line && /⟦s[ft]:/.test(fmt);     // baris yang isinya hanya stiker tetap disimpan
+    if (!line && !hanyaStiker) { if (section === "bebas") flushPara(); if (section === "ringkasan" && mod && mod.ringkasan && !mod.ringkasan.endsWith("\n\n")) mod.ringkasan += "\n"; continue; }
     const isBullet = BUL.test(line);
     const two = (re) => fl.match(re) || line.match(re);    // ambil isi dengan format kalau bisa
     let m;
@@ -450,6 +451,16 @@ const htmlStikerFoto = (id, kelas = "stiker-foto", untukEditor = false) => {
   if (!f || !/^data:image\/(png|webp|jpeg);base64,[a-z0-9+/=]+$/i.test(f.data)) return "";
   return `<img class="${kelas}" src="${f.data}" alt="stiker" data-st="${esc(id)}"${untukEditor ? ' contenteditable="false" draggable="false"' : ""}>`;
 };
+// Stiker melayang (bisa digeser): ⟦sf:f-ID|dx|dy|ukuran|putar⟧ atau ⟦sf:e-🌸|...⟧
+const RE_SF = /⟦sf:([fe])-([^|⟦⟧]{1,24})\|(-?\d{1,4})\|(-?\d{1,4})\|(\d{2,3})\|(-?\d{1,3})⟧/g;
+function htmlMelayang(k, v, dx, dy, uk, rot, untukEditor) {
+  dx = Math.max(-2000, Math.min(2000, Number(dx) || 0)); dy = Math.max(-2000, Math.min(2000, Number(dy) || 0));
+  uk = Math.max(24, Math.min(320, Number(uk) || 80)); rot = Math.max(-180, Math.min(180, Number(rot) || 0));
+  let isi;
+  if (k === "f") { const f = cariStikerFoto(v); if (!f || !/^data:image\/(png|webp|jpeg);base64,[a-z0-9+/=]+$/i.test(f.data)) return ""; isi = `<img src="${f.data}" alt="stiker" draggable="false">`; }
+  else { if (!STIKER_TULISAN.includes(v)) return ""; isi = `<span class="sf-emoji" style="font-size:${Math.round(uk * 0.78)}px">${v}</span>`; }
+  return `<span class="jangkar" data-sf="${k}-${esc(v)}|${dx}|${dy}|${uk}|${rot}"${untukEditor ? ' contenteditable="false"' : ""}><span class="melayang" style="left:${dx}px;top:${dy}px;width:${uk}px;height:${uk}px;transform:rotate(${rot}deg)">${isi}</span></span>`;
+}
 function tampilStiker(st) {
   if (String(st).startsWith("foto:")) return htmlStikerFoto(st.slice(5), "stiker-foto sampul") || "📚";
   return esc(st);
@@ -845,6 +856,11 @@ function editorKeTeks(root, opsi = {}) {
       if (n.nodeType !== 1) return;
       const tag = n.tagName;
       if (tag === "BR") { baris(); habisBr = true; return; }
+      if (n.classList && n.classList.contains("jangkar")) {
+        const t = `⟦sf:${n.getAttribute("data-sf") || ""}⟧`;
+        if (new RegExp(RE_SF.source).test(t)) { cur += t; habisBr = false; }
+        return;
+      }
       if (tag === "IMG") { const id = n.getAttribute("data-st"); if (id && /^[a-z0-9]{4,20}$/.test(id)) { cur += `⟦st:${id}⟧`; habisBr = false; } return; }
       if (/^(SCRIPT|STYLE|META|TITLE)$/.test(tag)) return;
       if (BLOK.test(tag)) {
@@ -944,7 +960,7 @@ function enhanceRich(ta, kind = "block") {
   ed.innerHTML = teksKeEditor(nilaiAsli.get.call(ta), inline);
   ed.addEventListener("input", () => {
     ta._sinkron = true; ta.value = editorKeTeks(ed); ta._sinkron = false;
-    if (!ed.textContent.trim() && !ed.querySelector("h2,h3,img")) ed.innerHTML = "";
+    if (!ed.textContent.trim() && !ed.querySelector("h2,h3,img,.jangkar")) ed.innerHTML = "";
     perbaruiTombol();
   });
   // tempel: ambil tebal/miring/judul saja, buang gaya lain dari Word/PDF/web
@@ -1119,11 +1135,13 @@ document.addEventListener("click", (e) => {
     if (ed._range && ed.contains(ed._range.startContainer)) { sel.removeAllRanges(); sel.addRange(ed._range); }
     else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
   }
-  if (st.dataset.stiker.startsWith("foto:")) {
-    const html = htmlStikerFoto(st.dataset.stiker.slice(5), "stiker-foto", true);
-    if (html && !document.execCommand("insertHTML", false, html + "\u200b")) {
-      const r = sel.getRangeAt(0); r.deleteContents(); const frag = r.createContextualFragment(html); const img = frag.firstChild; r.insertNode(frag); r.setStartAfter(img); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+  const foto = st.dataset.stiker.startsWith("foto:");
+  const html = foto ? htmlMelayang("f", st.dataset.stiker.slice(5), 0, -24, 96, 0, true) : htmlMelayang("e", st.dataset.stiker, 0, -16, 56, 0, true);
+  if (html) {
+    if (!document.execCommand("insertHTML", false, html + "\u200b")) {
+      const r = sel.getRangeAt(0); r.deleteContents(); const frag = r.createContextualFragment(html); const el = frag.firstChild; r.insertNode(frag); r.setStartAfter(el); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
     }
+    toast("👆 Geser stikernya ke mana saja. Ketuk stiker untuk ubah ukuran, putar, atau hapus.");
   } else if (!document.execCommand("insertText", false, st.dataset.stiker)) {
     const r = sel.getRangeAt(0); r.deleteContents(); const t = document.createTextNode(st.dataset.stiker); r.insertNode(t); r.setStartAfter(t); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
   }
@@ -1570,7 +1588,8 @@ function fmtInline(html, untukEditor = false) {
     h = h.replace(/⟦([fzsw]):([^⟦⟧]{1,40})⟧([^⟦⟧]*?)⟦\/\1⟧/g, (_, k, v, t) => gayaHtml(k, v, t, untukEditor));
   } while (h !== sebelum);
   h = h.replace(/⟦st:([a-z0-9]{4,20})⟧/g, (_, id) => htmlStikerFoto(id, "stiker-foto", untukEditor));
-  h = h.replace(/⟦[^⟦⟧]{0,40}⟧/g, "");    // tanda yang tidak lengkap dibuang, tidak pernah terlihat
+  h = h.replace(RE_SF, (_, k, v, dx, dy, uk, rot) => htmlMelayang(k, v, dx, dy, uk, rot, untukEditor));
+  h = h.replace(/⟦[^⟦⟧]{0,60}⟧/g, "");    // tanda yang tidak lengkap dibuang, tidak pernah terlihat
   return h
     // tebal + miring sekaligus: ***teks***
     .replace(/\*\*\*(\s*)([^*\n]*?[^*\s])(\s*)\*\*\*/g, "$1<strong><em>$2</em></strong>$3")
@@ -2454,7 +2473,7 @@ window.addEventListener("appinstalled", () => {
    PEMBUAT STIKER FOTO: pilih foto → atur potongan → simpan
    ============================================================ */
 const UK_STIKER = 320;
-const ps = { img: null, zoom: 1, x: 0, y: 0, bentuk: "lingkaran", latar: 0, pinggir: true };
+const ps = { img: null, zoom: 1, x: 0, y: 0, bentuk: "lingkaran", latar: 0, pinggir: true, titik: [], menggambar: false };
 function bukaStikerFoto() {
   ps.img = null;
   $("psLangkah1").classList.remove("hidden");
@@ -2490,7 +2509,7 @@ $("psFile").addEventListener("change", () => {
   if (!/^image\//.test(f.type)) { showMsg("psMsg", "😕 Pilih file foto (JPG/PNG) ya."); return; }
   const img = new Image();
   img.onload = () => {
-    ps.img = img; ps.zoom = 1; ps.x = 0; ps.y = 0; ps.latar = 0;
+    ps.img = img; ps.zoom = 1; ps.x = 0; ps.y = 0; ps.latar = 0; ps.titik = [];
     $("psZoom").value = 1; $("psLatar").value = 0;
     tampilLangkah2(true); showMsg("psMsg", "");
     gambarStiker();
@@ -2498,21 +2517,42 @@ $("psFile").addEventListener("change", () => {
   img.onerror = () => showMsg("psMsg", "😕 Foto ini tidak bisa dibuka. Coba foto lain (JPG/PNG).");
   img.src = URL.createObjectURL(f);
 });
-document.querySelectorAll('input[name="psBentuk"]').forEach((r) => r.addEventListener("change", () => { ps.bentuk = r.value; gambarStiker(); }));
+function aturInfoBebas() {
+  const bebas = ps.bentuk === "bebas";
+  $("psBebasInfo").classList.toggle("hidden", !bebas);
+  $("psGeserInfo").classList.toggle("hidden", bebas);
+}
+document.querySelectorAll('input[name="psBentuk"]').forEach((r) => r.addEventListener("change", () => { ps.bentuk = r.value; aturInfoBebas(); gambarStiker(); }));
+$("psUlangGambar").addEventListener("click", () => { ps.titik = []; gambarStiker(); });
 $("psZoom").addEventListener("input", () => { ps.zoom = Number($("psZoom").value); gambarStiker(); });
 $("psLatar").addEventListener("input", () => { ps.latar = Number($("psLatar").value); gambarStiker(); });
 $("psPinggir").addEventListener("change", () => { ps.pinggir = $("psPinggir").checked; gambarStiker(); });
 (() => {   // geser foto dengan jari / mouse
   let tarik = null;
   const c = $("psKanvas");
-  c.addEventListener("pointerdown", (e) => { if (!ps.img) return; tarik = { x: e.clientX, y: e.clientY, ox: ps.x, oy: ps.y }; try { c.setPointerCapture(e.pointerId); } catch (er) {} });
+  const titikDi = (e) => { const r = c.getBoundingClientRect(), k = UK_STIKER / r.width; return [(e.clientX - r.left) * k, (e.clientY - r.top) * k]; };
+  c.addEventListener("pointerdown", (e) => {
+    if (!ps.img) return;
+    e.preventDefault();
+    try { c.setPointerCapture(e.pointerId); } catch (er) {}
+    if (ps.bentuk === "bebas") { ps.titik = [titikDi(e)]; ps.menggambar = true; gambarStiker(); return; }
+    tarik = { x: e.clientX, y: e.clientY, ox: ps.x, oy: ps.y };
+  });
   c.addEventListener("pointermove", (e) => {
+    if (ps.menggambar) {
+      const p = titikDi(e), akhir = ps.titik[ps.titik.length - 1];
+      if (Math.hypot(p[0] - akhir[0], p[1] - akhir[1]) > 2) { ps.titik.push(p); gambarStiker(); }
+      return;
+    }
     if (!tarik) return;
     const skala = UK_STIKER / c.getBoundingClientRect().width;
     ps.x = tarik.ox + (e.clientX - tarik.x) * skala; ps.y = tarik.oy + (e.clientY - tarik.y) * skala;
     gambarStiker();
   });
-  const lepas = () => (tarik = null);
+  const lepas = () => {
+    tarik = null;
+    if (ps.menggambar) { ps.menggambar = false; if (ps.titik.length < 6) ps.titik = []; gambarStiker(); }
+  };
   c.addEventListener("pointerup", lepas); c.addEventListener("pointercancel", lepas);
 })();
 function jalurBentuk(ctx, bentuk, S, m) {
@@ -2536,6 +2576,8 @@ function jalurBentuk(ctx, bentuk, S, m) {
     ctx.arc(c - w * 0.04, c - w * 0.12, w * 0.28, Math.PI * 1.05, Math.PI * 1.85);
     ctx.arc(c + w * 0.24, c + w * 0.05, w * 0.25, Math.PI * 1.4, Math.PI * 0.5);
     ctx.lineTo(c - w * 0.24, c + w * 0.32);
+  } else if (bentuk === "bebas" && ps.titik.length > 2) {
+    ps.titik.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   } else ctx.rect(0, 0, S, S);
   ctx.closePath();
 }
@@ -2586,16 +2628,41 @@ function buatStiker() {
 }
 function gambarStiker() {
   if (!ps.img) return;
-  const c = $("psKanvas"), ctx = c.getContext("2d");
-  c.width = c.height = UK_STIKER;
-  ctx.clearRect(0, 0, UK_STIKER, UK_STIKER);
+  const c = $("psKanvas"), ctx = c.getContext("2d"), S = UK_STIKER;
+  c.width = c.height = S;
+  ctx.clearRect(0, 0, S, S);
+  // mode bebas: selama menggambar (atau belum ada garis), tampilkan seluruh foto + garis potongnya
+  if (ps.bentuk === "bebas" && (ps.menggambar || ps.titik.length < 3)) {
+    const img = ps.img, dasar = Math.max(S / img.width, S / img.height) * ps.zoom;
+    const w = img.width * dasar, h = img.height * dasar;
+    ctx.globalAlpha = 0.85; ctx.drawImage(img, (S - w) / 2 + ps.x, (S - h) / 2 + ps.y, w, h); ctx.globalAlpha = 1;
+    if (ps.titik.length > 1) {
+      ctx.lineJoin = ctx.lineCap = "round";
+      ctx.beginPath(); ps.titik.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7; ctx.stroke();
+      ctx.setLineDash([10, 8]); ctx.strokeStyle = "#e0558a"; ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]);
+    }
+    return;
+  }
   ctx.drawImage(buatStiker(), 0, 0);
+}
+// buang bagian kosong di sekeliling stiker, supaya ukurannya pas
+function rapikanStiker(src, ukuran) {
+  const S = src.width, p = src.getContext("2d").getImageData(0, 0, S, S).data;
+  let x0 = S, y0 = S, x1 = -1, y1 = -1;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (p[(y * S + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const out = document.createElement("canvas"); out.width = out.height = ukuran;
+  if (x1 < 0) return out;
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, sisi = Math.max(w, h) * 1.04;
+  const k = ukuran / sisi;
+  out.getContext("2d").drawImage(src, x0, y0, w, h, (ukuran - w * k) / 2, (ukuran - h * k) / 2, w * k, h * k);
+  return out;
 }
 $("psSimpan").addEventListener("click", () => {
   if (!ps.img) return;
   if (stikerFoto.length >= MAKS_STIKER_FOTO) { showMsg("psMsg", `Stiker foto sudah ${MAKS_STIKER_FOTO}. Hapus yang tidak dipakai dulu ya.`); return; }
-  const kecil = document.createElement("canvas"); kecil.width = kecil.height = 200;
-  kecil.getContext("2d").drawImage(buatStiker(), 0, 0, 200, 200);
+  if (ps.bentuk === "bebas" && ps.titik.length < 3) { showMsg("psMsg", "Gambar dulu garis mengelilingi bagian foto yang mau diambil ya."); return; }
+  const kecil = rapikanStiker(buatStiker(), 220);
   let data = kecil.toDataURL("image/webp", 0.85);
   if (!data.startsWith("data:image/webp")) data = kecil.toDataURL("image/png");
   stikerFoto.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data });
@@ -2605,7 +2672,7 @@ $("psSimpan").addEventListener("click", () => {
     return;
   }
   toast("🎉 Stiker foto tersimpan. Bisa dipilih di 🌟 Stiker dan di sampul buku.");
-  ps.img = null; tampilLangkah2(false);
+  ps.img = null; ps.titik = []; tampilLangkah2(false);
   renderDaftarStikerFoto(); segarkanStiker();
 });
 function segarkanStiker() {
@@ -2661,3 +2728,79 @@ $("hfDaftar").addEventListener("click", (e) => {
   PETA_HURUF.delete(nama.toLowerCase());
   renderHurufSaya(); segarkanPilihanHuruf(); renderAll();
 });
+
+/* ============================================================
+   STIKER MELAYANG: geser dengan jari, ketuk untuk ubah ukuran/putar/hapus
+   ============================================================ */
+const panelStiker = document.createElement("div");
+panelStiker.className = "panel-stiker hidden";
+panelStiker.innerHTML = `<button type="button" data-ps="kecil" aria-label="Perkecil">➖</button><button type="button" data-ps="besar" aria-label="Perbesar">➕</button>
+  <button type="button" data-ps="kiri" aria-label="Putar ke kiri">↺</button><button type="button" data-ps="kanan" aria-label="Putar ke kanan">↻</button>
+  <button type="button" data-ps="hapus" aria-label="Hapus stiker">🗑️</button><button type="button" data-ps="selesai" aria-label="Selesai">✔️</button>`;
+document.body.appendChild(panelStiker);
+let stikerAktif = null, geser = null;
+const bacaSf = (j) => { const [v, dx, dy, uk, rot] = String(j.dataset.sf).split("|"); return { v, dx: +dx, dy: +dy, uk: +uk, rot: +rot }; };
+function tulisSf(j, d) {
+  j.dataset.sf = [d.v, Math.round(d.dx), Math.round(d.dy), Math.round(d.uk), Math.round(d.rot)].join("|");
+  const m = j.firstElementChild;
+  m.style.left = Math.round(d.dx) + "px"; m.style.top = Math.round(d.dy) + "px";
+  m.style.width = m.style.height = Math.round(d.uk) + "px";
+  m.style.transform = `rotate(${Math.round(d.rot)}deg)`;
+  const em = m.querySelector(".sf-emoji"); if (em) em.style.fontSize = Math.round(d.uk * 0.78) + "px";
+}
+function simpanEditorDari(j) { const ed = j.closest(".editor"); if (ed) ed.dispatchEvent(new Event("input", { bubbles: true })); }
+function tutupPanelStiker() { panelStiker.classList.add("hidden"); if (stikerAktif) stikerAktif.classList.remove("dipilih"); stikerAktif = null; }
+function letakkanPanel() {
+  if (!stikerAktif) return;
+  const r = stikerAktif.firstElementChild.getBoundingClientRect();
+  const lebar = panelStiker.offsetWidth || 280;
+  panelStiker.style.left = Math.max(8, Math.min(window.innerWidth - lebar - 8, r.left + r.width / 2 - lebar / 2)) + "px";
+  const bawah = r.bottom + 8, muat = bawah + 56 < window.innerHeight;
+  panelStiker.style.top = (muat ? bawah : Math.max(8, r.top - 56)) + "px";
+}
+document.addEventListener("pointerdown", (e) => {
+  const m = e.target.closest && e.target.closest(".editor .melayang");
+  if (!m) { if (!e.target.closest(".panel-stiker")) tutupPanelStiker(); return; }
+  e.preventDefault();
+  const j = m.parentElement, ed = j.closest(".editor");
+  const d = bacaSf(j);
+  geser = { m, j, ed, x: e.clientX, y: e.clientY, d0: { ...d }, gerak: false };
+  try { m.setPointerCapture(e.pointerId); } catch (er) {}
+});
+document.addEventListener("pointermove", (e) => {
+  if (!geser) return;
+  const ddx = e.clientX - geser.x, ddy = e.clientY - geser.y;
+  if (!geser.gerak && Math.hypot(ddx, ddy) < 5) return;
+  geser.gerak = true;
+  if (stikerAktif) panelStiker.classList.add("hidden");
+  // tetap di dalam kotak tulisan
+  const a = geser.j.getBoundingClientRect(), b = geser.ed.getBoundingClientRect(), uk = geser.d0.uk;
+  const d = { ...geser.d0 };
+  d.dx = Math.max(b.left - a.left, Math.min(b.right - a.left - uk, geser.d0.dx + ddx));
+  d.dy = Math.max(b.top - a.top, Math.min(b.bottom - a.top - uk, geser.d0.dy + ddy));
+  tulisSf(geser.j, d);
+});
+const lepasGeser = () => {
+  if (!geser) return;
+  const g = geser; geser = null;
+  if (g.gerak) { simpanEditorDari(g.j); if (stikerAktif === g.j) { panelStiker.classList.remove("hidden"); letakkanPanel(); } return; }
+  // ketuk: pilih stiker
+  if (stikerAktif && stikerAktif !== g.j) stikerAktif.classList.remove("dipilih");
+  stikerAktif = g.j; g.j.classList.add("dipilih");
+  panelStiker.classList.remove("hidden"); letakkanPanel();
+};
+document.addEventListener("pointerup", lepasGeser);
+document.addEventListener("pointercancel", lepasGeser);
+panelStiker.addEventListener("pointerdown", (e) => e.preventDefault());
+panelStiker.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ps]"); if (!b || !stikerAktif) return;
+  const j = stikerAktif, d = bacaSf(j), aksi = b.dataset.ps;
+  if (aksi === "selesai") { tutupPanelStiker(); return; }
+  if (aksi === "hapus") { const ed = j.closest(".editor"); tutupPanelStiker(); j.remove(); if (ed) ed.dispatchEvent(new Event("input", { bubbles: true })); return; }
+  if (aksi === "kecil") d.uk = Math.max(24, d.uk - 12);
+  if (aksi === "besar") d.uk = Math.min(320, d.uk + 12);
+  if (aksi === "kiri") d.rot = Math.max(-180, d.rot - 10);
+  if (aksi === "kanan") d.rot = Math.min(180, d.rot + 10);
+  tulisSf(j, d); simpanEditorDari(j); letakkanPanel();
+});
+window.addEventListener("scroll", () => { if (stikerAktif) letakkanPanel(); }, true);

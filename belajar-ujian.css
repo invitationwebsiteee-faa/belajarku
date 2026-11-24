@@ -552,3 +552,18 @@ label.check-row { justify-content: flex-start; border-bottom: 0; padding: 4px 0;
 .hf-daftar { display: grid; gap: 8px; }
 .hf-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--white); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .hf-item span { font-size: 1.15rem; overflow-wrap: anywhere; }
+
+/* ===== STIKER MELAYANG (bisa digeser) ===== */
+.jangkar { position: relative; display: inline-block; width: 0; height: 0; vertical-align: top; line-height: 0; }
+.melayang { position: absolute; z-index: 3; display: block; pointer-events: none; transform-origin: 50% 50%; }
+.melayang img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.15)); -webkit-user-drag: none; user-select: none; }
+.sf-emoji { display: grid; place-items: center; width: 100%; height: 100%; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12)); user-select: none; }
+.editor .melayang { pointer-events: auto; cursor: grab; touch-action: none; }
+.editor .melayang:active { cursor: grabbing; }
+.editor .jangkar.dipilih .melayang { outline: 2px dashed var(--ming); outline-offset: 3px; border-radius: 8px; }
+.editor { position: relative; }
+.panel-stiker { position: fixed; z-index: 80; display: flex; gap: 4px; background: #ffffff; border: 1.5px solid var(--line); border-radius: 14px; padding: 5px; box-shadow: 0 8px 22px rgba(63,95,143,0.22); }
+.panel-stiker button { min-width: 42px; min-height: 42px; border: 0; border-radius: 10px; background: var(--soft); font-size: 1.1rem; cursor: pointer; color: var(--espresso); }
+.panel-stiker button:hover { background: #ffe6ef; }
+.rich .jangkar { z-index: 2; }
+.ps-bebas-info { background: #fff0f5; border: 1.5px dashed var(--peony); border-radius: 12px; padding: 10px 12px; font-size: 0.92rem; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }

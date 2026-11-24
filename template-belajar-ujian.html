@@ -398,10 +398,15 @@
     <div id="psLangkah2" class="hidden">
       <div class="ps-kerja">
         <canvas id="psKanvas" width="320" height="320" aria-label="Pratinjau stiker"></canvas>
-        <small class="muted">👆 Geser foto dengan jari untuk mengatur posisinya.</small>
+        <small class="muted" id="psGeserInfo">👆 Geser foto dengan jari untuk mengatur posisinya.</small>
+        <div id="psBebasInfo" class="ps-bebas-info hidden">
+          ✍️ <b>Gambar garis</b> dengan jari mengelilingi bagian foto yang mau diambil, lalu lepaskan. Bagian di luar garis akan dibuang.
+          <button type="button" class="btn small" id="psUlangGambar">↺ Gambar ulang</button>
+        </div>
       </div>
       <div class="field">Bentuk potongan
         <div class="seg ps-bentuk">
+          <label><input type="radio" name="psBentuk" value="bebas"> ✂️ Potong bebas</label>
           <label><input type="radio" name="psBentuk" value="lingkaran" checked> ⚪ Lingkaran</label>
           <label><input type="radio" name="psBentuk" value="kotak"> 🔲 Kotak</label>
           <label><input type="radio" name="psBentuk" value="hati"> 💗 Hati</label>
