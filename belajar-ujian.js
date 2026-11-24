@@ -2758,18 +2758,37 @@ function letakkanPanel() {
   const bawah = r.bottom + 8, muat = bawah + 56 < window.innerHeight;
   panelStiker.style.top = (muat ? bawah : Math.max(8, r.top - 56)) + "px";
 }
-document.addEventListener("pointerdown", (e) => {
-  const m = e.target.closest && e.target.closest(".editor .melayang");
-  if (!m) { if (!e.target.closest(".panel-stiker")) tutupPanelStiker(); return; }
-  e.preventDefault();
+// Di HP dipakai sentuhan (touch), di laptop dipakai mouse. Sentuhan di stiker
+// dicegah supaya HP tidak menggulir halaman / memunculkan keyboard saat stiker digeser.
+function mulaiGeser(target, x, y) {
+  const m = target && target.closest && target.closest(".editor .melayang");
+  if (!m) return false;
   const j = m.parentElement, ed = j.closest(".editor");
-  const d = bacaSf(j);
-  geser = { m, j, ed, x: e.clientX, y: e.clientY, d0: { ...d }, gerak: false };
-  try { m.setPointerCapture(e.pointerId); } catch (er) {}
-});
-document.addEventListener("pointermove", (e) => {
+  geser = { m, j, ed, x, y, d0: { ...bacaSf(j) }, gerak: false };
+  return true;
+}
+document.addEventListener("touchstart", (e) => {
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  if (mulaiGeser(e.target, t.clientX, t.clientY)) e.preventDefault();
+  else if (!e.target.closest(".panel-stiker")) tutupPanelStiker();
+}, { passive: false });
+document.addEventListener("touchmove", (e) => {
   if (!geser) return;
-  const ddx = e.clientX - geser.x, ddy = e.clientY - geser.y;
+  e.preventDefault();
+  const t = e.touches[0]; gerakGeser(t.clientX, t.clientY);
+}, { passive: false });
+document.addEventListener("touchend", (e) => { if (geser) { e.preventDefault(); lepasGeser(); } }, { passive: false });
+document.addEventListener("touchcancel", () => lepasGeser());
+document.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch") return;          // sudah ditangani touchstart
+  if (mulaiGeser(e.target, e.clientX, e.clientY)) { e.preventDefault(); try { geser.m.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (!e.target.closest(".panel-stiker")) tutupPanelStiker();
+});
+document.addEventListener("pointermove", (e) => { if (geser && e.pointerType !== "touch") gerakGeser(e.clientX, e.clientY); });
+function gerakGeser(cx, cy) {
+  if (!geser) return;
+  const ddx = cx - geser.x, ddy = cy - geser.y;
   if (!geser.gerak && Math.hypot(ddx, ddy) < 5) return;
   geser.gerak = true;
   if (stikerAktif) panelStiker.classList.add("hidden");
@@ -2779,7 +2798,7 @@ document.addEventListener("pointermove", (e) => {
   d.dx = Math.max(b.left - a.left, Math.min(b.right - a.left - uk, geser.d0.dx + ddx));
   d.dy = Math.max(b.top - a.top, Math.min(b.bottom - a.top - uk, geser.d0.dy + ddy));
   tulisSf(geser.j, d);
-});
+}
 const lepasGeser = () => {
   if (!geser) return;
   const g = geser; geser = null;
@@ -2789,8 +2808,8 @@ const lepasGeser = () => {
   stikerAktif = g.j; g.j.classList.add("dipilih");
   panelStiker.classList.remove("hidden"); letakkanPanel();
 };
-document.addEventListener("pointerup", lepasGeser);
-document.addEventListener("pointercancel", lepasGeser);
+document.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") lepasGeser(); });
+document.addEventListener("pointercancel", (e) => { if (e.pointerType !== "touch") lepasGeser(); });
 panelStiker.addEventListener("pointerdown", (e) => e.preventDefault());
 panelStiker.addEventListener("click", (e) => {
   const b = e.target.closest("[data-ps]"); if (!b || !stikerAktif) return;

@@ -567,3 +567,4 @@ label.check-row { justify-content: flex-start; border-bottom: 0; padding: 4px 0;
 .panel-stiker button:hover { background: #ffe6ef; }
 .rich .jangkar { z-index: 2; }
 .ps-bebas-info { background: #fff0f5; border: 1.5px dashed var(--peony); border-radius: 12px; padding: 10px 12px; font-size: 0.92rem; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.editor .melayang, .editor .melayang * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
