@@ -1138,9 +1138,13 @@ document.addEventListener("click", (e) => {
   const foto = st.dataset.stiker.startsWith("foto:");
   const html = foto ? htmlMelayang("f", st.dataset.stiker.slice(5), 0, -24, 96, 0, true) : htmlMelayang("e", st.dataset.stiker, 0, -16, 56, 0, true);
   if (html) {
-    if (!document.execCommand("insertHTML", false, html + "\u200b")) {
-      const r = sel.getRangeAt(0); r.deleteContents(); const frag = r.createContextualFragment(html); const el = frag.firstChild; r.insertNode(frag); r.setStartAfter(el); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
-    }
+    // disisipkan langsung (bukan lewat execCommand): Safari di iPhone mengubah isinya jadi huruf biasa
+    const r = sel.rangeCount ? sel.getRangeAt(0) : null;
+    const tmp = document.createElement("div"); tmp.innerHTML = html;
+    const el = tmp.firstElementChild, spasi = document.createTextNode("\u200b");
+    if (r && ed.contains(r.commonAncestorContainer)) { r.deleteContents(); r.insertNode(spasi); r.insertNode(el); }
+    else { const akhir = ed.lastElementChild && /^(DIV|P|H2|H3)$/.test(ed.lastElementChild.tagName) ? ed.lastElementChild : ed; akhir.appendChild(el); akhir.appendChild(spasi); }
+    const r2 = document.createRange(); r2.setStartAfter(spasi); r2.collapse(true); sel.removeAllRanges(); sel.addRange(r2);
     toast("👆 Geser stikernya ke mana saja. Ketuk stiker untuk ubah ukuran, putar, atau hapus.");
   } else if (!document.execCommand("insertText", false, st.dataset.stiker)) {
     const r = sel.getRangeAt(0); r.deleteContents(); const t = document.createTextNode(st.dataset.stiker); r.insertNode(t); r.setStartAfter(t); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
@@ -2761,9 +2765,9 @@ function letakkanPanel() {
 // Di HP dipakai sentuhan (touch), di laptop dipakai mouse. Sentuhan di stiker
 // dicegah supaya HP tidak menggulir halaman / memunculkan keyboard saat stiker digeser.
 function mulaiGeser(target, x, y) {
-  const m = target && target.closest && target.closest(".editor .melayang");
-  if (!m) return false;
-  const j = m.parentElement, ed = j.closest(".editor");
+  const j = target && target.closest && target.closest(".editor .jangkar");
+  if (!j || !j.firstElementChild) return false;
+  const m = j.firstElementChild, ed = j.closest(".editor");
   geser = { m, j, ed, x, y, d0: { ...bacaSf(j) }, gerak: false };
   return true;
 }
